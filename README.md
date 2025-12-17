@@ -88,11 +88,12 @@ Our EDA revealed a fundamental shift in strategy following the 2022 regulations:
 
 ### 3. Model Performance
 
-| Model | Split Strategy | Metric | Performance | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Lap Regression** | Chronological | R² | 0.313 | Hard to predict exact lap due to traffic/undercuts. |
-| **Strategy Classification** | **Chronological** | **Accuracy** | **47.5%** | Realistic performance expectation. |
-| Strategy Classification | Random | Accuracy | 64.4% | Overly optimistic (upper bound). |
+| Model | Task | Algorithm | Split | Train Score | Test Score |
+|-------|------|-----------|-------|-------------|------------|
+| A1 | Lap Number Regression | RandomForestRegressor | Chronological 70/15/15 | R2: 0.667 | R2: 0.313 |
+| A2 | Pit Stop Classification | **XGBClassifier** | Chronological 85/15 | Acc: 78.1 | Acc: 47.5 |
+| B1 | Lap Number Regression | RandomForestRegressor | Random 70/15/15 | R2: 0.644 | R2: 0.565 |
+| B2 | Pit Stop Classification | **XGBClassifier** | Random 70/15/15 | Acc: 79.0 | Acc: 64.4 |
 
 ### 3. Feature Importance
 Recent data is more valuable than deep history. The top featurees for our prediction were:
