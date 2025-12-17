@@ -1,60 +1,128 @@
-# F1 Pit Stop Strategy Recommender
+# F1 Pit Stop Lap and Count Prediction Using Machine Learning
 
-Pit stop strategy is one of the most critical factors influencing success in Formula 1.  
-The timing of stops, number of stops, tire choices, and interaction with weather and circuit layout can make the difference between winning and finishing outside the points.
 
-Our **DATA602 project** aims to build a **data-driven pit stop strategy recommender system**.  
-Given race conditions (driver pace, track type, weather conditions, and competitor context), the model will recommend:
+## Project Overview
 
-- The optimal number of pit stops (1-stop vs 2-stop, etc.)  
-- The laps to pit on  
-- The tyre compound (Soft, Medium, or Hard) that maximizes expected finishing outcome  
-- The expected performance impact (finishing position gain/loss)  
+Formula 1 racing is one of the most strategically complex sports in the world. Among the many tactical decisions, **pit stop strategy**—the timing and frequency of stops—can determine the difference between victory and defeat.
 
-This project demonstrates the full data science pipeline: **data acquisition, integration, exploratory analysis, hypothesis testing, modeling, and building a practical tool for optimized decision-making**.
+This project aims to build a **data-driven pit stop strategy recommender system** that answers two key questions:
+1.  **Lap Prediction:** *When* will a pit stop occur? (Regression)
+2.  **Strategy Classification:** *How many* stops will a driver make? (1-stop, 2-stop, or 3+ stops)
+
+A major focus of this project is analyzing **Distribution Shift** in data and strategy: How machine learning models adapt (or fail to adapt) when regulations change significantly, specifically analyzing the impact of the **2022 F1 regulation overhaul**. Using this data to predict subsequent pit stops and pit lap count.
 
 ---
 
-## Datasets 
+**Course:** DATA602: Principles of Data Science (Fall 2025)    
 
-### 1. [Formula 1 World Championship (1950 - 2024)](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020/data)
+## Team Members
 
-**Files we will use:**
-- `circuits.csv` → circuit metadata (track names, locations, lengths)  
-- `constructors.csv`, `constructor_results.csv`, `constructor_standings.csv` → team-level details  
-- `drivers.csv`, `driver_standings.csv` → driver information and rankings  
-- `lap_times.csv` → lap-by-lap timings for each driver in each race  
-- `pit_stops.csv` → pit stop timings, lap numbers, durations  
-- `qualifying.csv` → qualifying results and grid positions  
-- `races.csv`, `seasons.csv` → race and season information  
-- `results.csv`, `sprint_results.csv` → race and sprint outcomes  
-- `status.csv` → finishing status (accident, engine failure, etc.)  
-
-**Why this dataset?**
-- Covers multiple seasons and circuits with consistent schemas.  
-- Enables learning of generalizable patterns across **track types, eras, and regulations**.  
-- Pit stop and lap time data allow us to build **stint-level performance views** and measure:
-  - Lap time drift within stints  
-  - Undercut/overcut windows  
-  - Value of track position vs. tyre freshness  
-- Tables link through stable keys (season, race, driver), making joins straightforward.  
+| Name | ID |
+| :--- | :--- |
+| **Stuti Patel** | 122013834 |
+| **Riya Puri** | 122099296 |
+| **Kshitij Lnu** | 121507990 |
 
 ---
 
-### 2. [FastF1 API Dataset](https://docs.fastf1.dev/)
+## Data Curation & Pipeline
 
-**Features we will extract:**
-- Weather data → air/track temperature, humidity, wind speed  
-- Tyre compound data → compound choice (soft, medium, hard) per stint/lap  
-- Safety car information  
+**Source:** [Ergast Developer API](http://ergast.com/mrd/) (via Kaggle).  
+**Scope:** Races from **2016 to 2024** to ensure relevance to modern electronic timing and racing conditions.
 
-**Why this dataset?**
-- Provides **tyre and stint data** critical for simulating strategies.  
-- Captures **dynamic race conditions** (weather, safety cars) that directly influence pit decisions.  
+### 1. Data Processing
+We integrated 7 separate CSV files to create a master dataset:
+* `races.csv`, `results.csv`, `pit_stops.csv` (Target variables)
+* `circuits.csv`, `drivers.csv`, `constructors.csv` (Contextual metadata)
+* `qualifying.csv` (Performance metrics)
+
+**Key Cleaning Steps:**
+* **Temporal Filtering:** Removed pre-2016 data to reduce noise. Major regulation changes in *2014–2015* (due to hybrid engines etc.),  which significantly dropped the average number of pitstops.
+* **Imputation:** Handled missing qualifying positions (e.g., pit lane starts) by defaulting to grid position 20.
+* **Filtering:** Removed "Did Not Finish" (DNF) records (<90% race distance) to avoid skewed stop counts.
+
+### 2. Feature Engineering
+We generated **38 features** focusing on "Time-Awareness" to prevent data leakage:
+* **Recent Rolling Averages:** 10, 15, and 20-race windows for drivers, constructors, and circuits.
+* **Historical Averages:** Expanding window averages for long-term trends.
+* **Temporal Flags:** `is_2022_plus` binary flag to capture the regulation era shift.
+* **Context:** Grid position, track latitude/longitude, and season progress percentage.
 
 ---
 
-## Group Members
-1. **Kshitij LNU** – 121507990  
-2. **Riya Puri** – 122099296  
-3. **Stuti Patel** – 122013834  
+## Methodology & Models
+
+We formulated the problem into two distinct tasks:
+
+### Task A: Lap Number Prediction (Regression)
+* **Algorithm:** Random Forest Regressor
+* **Hyperparameters:** `n_estimators=100`, `max_depth=8`
+* **Goal:** Predict the specific lap number (1-70) a driver will box.
+
+### Task B: Strategy Classification (Classification)
+* **Algorithm:** XGBoost Classifier
+* **Hyperparameters:** `n_estimators=200`, `max_depth=4`, `learning_rate=0.05`, `reg_alpha=0.1`
+* **Why XGBoost?** Chosen for its ability to handle **class imbalance** and **distribution shifts** better than Random Forest via sequential error correction.
+
+### Experimental Design: Chronological vs. Random Split
+To simulate real-world deployment, we evaluated models using two splitting strategies for both Regressions and Classification models:
+1.  **Chronological Split (Realistic):** Train (2016-Mid 2022) / Validation / Test (Late 2023-2024). We do not want to train our model on future data to make past data predictions.
+2.  **Random Split (Optimistic):** Shuffled data, which ignores temporal evolution.
+
+---
+
+## Key Results & Findings
+
+### 1. The "2022 Shift"
+Our EDA revealed a fundamental shift in strategy following the 2022 regulations:
+* **Pre-2022:** 1-stop strategies were dominant (44%).
+* **Post-2022:** 2-stop strategies became dominant (46%).
+* *Impact:* Models trained solely on old data struggle to predict the aggressive 2-stop strategies of the current era.
+
+### 2. Relevance of removing data before 2016
+
+- ⁠Major regulation changes in *2014–2015* (hybrid engines) causing changes in strategy and overall stats
+- Different tire behavior and degradation patterns
+- ⁠Different pit stop norms and race strategies. The average number pit stops per driver reduces significantly after 2015 regulation change.
+- Smaller and less consistent pit stop datasets
+
+### 3. Model Performance
+
+| Model | Task | Algorithm | Split | Train Score | Test Score |
+|-------|------|-----------|-------|-------------|------------|
+| A1 | Lap Number Regression | RandomForestRegressor | Chronological 70/15/15 | R2: 0.667 | R2: 0.313 |
+| A2 | Pit Stop Classification | **XGBClassifier** | Chronological 85/15 | Acc: 78.1 | Acc: 47.5 |
+| B1 | Lap Number Regression | RandomForestRegressor | Random 70/15/15 | R2: 0.644 | R2: 0.565 |
+| B2 | Pit Stop Classification | **XGBClassifier** | Random 70/15/15 | Acc: 79.0 | Acc: 64.4 |
+
+### 3. Feature Importance
+Recent data is more valuable than deep history. The top featurees for our prediction were:
+1.  `circuit_recent_avg` (Rolling average of stops at this track)
+2.  `constructor_recent_avg` (Team's recent strategic tendencies)
+3.  `total_race_laps`
+
+---
+
+## References
+1. **Kaggle F1 Dataset:** https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020 
+2. [cite_start]**Data Source:** [Ergast Developer API](http://ergast.com/mrd/) [cite: 317]
+2.  **XGBoost:** Chen, T., & Guestrin, C. (2016). [cite_start]*XGBoost: A Scalable Tree Boosting System.* [cite: 320]
+3.  **Random Forest:** Breiman, L. (2001). [cite_start]*Random Forests.* Machine Learning. [cite: 321]
+4. **Formula 1 Official Website:** https://www.formula1.com/
+
+---
+
+## Repository Structure
+
+```bash
+├── data/                          # Raw CSV datasets sourced from Ergast API
+│   ├── races.csv                  # Race metadata (date, circuit, round)
+│   ├── results.csv                # Race results per driver
+│   ├── pit_stops.csv              # Individual pit stop records (Target)
+│   ├── circuits.csv               # Circuit information (location, altitude)
+│   ├── drivers.csv                # Driver information
+│   ├── constructors.csv           # Team/constructor information
+│   └── qualifying.csv             # Qualifying session results
+├── f1_pitstop_prediction.ipynb    # Main Jupyter Notebook with code & analysis
+├── index.html                     # Comprehensive Project Report and Tutorial
+└── README.md                      # Project documentation
